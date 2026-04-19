@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Aspirin Synthesis — Sankey Diagram</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #fff; margin: 2rem; }
+  #tip {
+    position: absolute; display: none;
+    background: #fff; border: 0.5px solid #ccc;
+    border-radius: 8px; padding: 6px 10px;
+    font-size: 11px; pointer-events: none;
+    z-index: 10; max-width: 180px;
+  }
+  #leg { display: flex; gap: 14px; flex-wrap: wrap;
+         justify-content: center; font-size: 11px;
+         color: #666; padding: 8px 0 1rem; }
+</style>
+</head>
+<body>
+ 
+<div style="position:relative; width:100%">
+  <svg id="sk" style="display:block; width:100%; height:auto"></svg>
+  <div id="tip"></div>
+</div>
+<div id="leg"></div>
+ 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+<script>
+ 
+/* ── dimensions ─────────────────────────────────── */
+const W   = 680, H = 520;
+const PAD = { top: 24, right: 148, bottom: 24, left: 100 };
+ 
+/* ── color palette ───────────────────────────────── */
+const C = {
+  input:   "#378ADD",   // blue  — raw materials
+  process: "#5F5E5A",   // gray  — reactors
+  product: "#639922",   // green — desired products
+  loss:    "#BA7517",   // amber — yield losses / untracked
+  waste:   "#D85A30",   // coral — waste / byproducts
+};
+ 
+/* ── node definitions ────────────────────────────── */
+// id, display name, sub-label (mass), category
+const nodeData = [
+  { id: 0,  name: "NaOC\u2086H\u2085ONa",  sub: "2056 g",  cat: "input"   },
+  { id: 1,  name: "CO\u2082 (Step 1)",      sub: "675 g",   cat: "input"   },
+  { id: 2,  name: "Step 1",                 sub: "Kolbe-Schmitt", cat: "process" },
+  { id: 3,  name: "Salicylic acid",         sub: "1648 g",  cat: "product" },
+  { id: 4,  name: "Step 1 loss",            sub: "1083 g",  cat: "loss"    },
+  { id: 5,  name: "Methanol",               sub: "2549 g",  cat: "input"   },
+  { id: 6,  name: "Step 2",                 sub: "Oxidation", cat: "process" },
+  { id: 7,  name: "Acetic anhydride",       sub: "1538 g",  cat: "product" },
+  { id: 8,  name: "CO\u2082 waste",         sub: "850 g",   cat: "waste"   },
+  { id: 9,  name: "Step 2 untracked",       sub: "161 g",   cat: "loss"    },
+  { id: 10, name: "Step 3",                 sub: "Acetylation", cat: "process" },
+  { id: 11, name: "Aspirin",                sub: "1571 g",  cat: "product" },
+  { id: 12, name: "Acetic acid",            sub: "717 g",   cat: "waste"   },
+  { id: 13, name: "Excess Ac\u2082O",       sub: "319 g",   cat: "loss"    },
+  { id: 14, name: "Step 3 loss",            sub: "579 g",   cat: "loss"    },
+];
+ 
+/* ── link definitions ────────────────────────────── */
+// source/target = node id, value = grams
+// Step 3 closes: in 1648+1538=3186, out 1571+717+319+579=3186 ✓
+const linkData = [
+  { source: 0,  target: 2,  value: 2056 },  // NaOPh  → Step 1
+  { source: 1,  target: 2,  value: 675  },  // CO₂    → Step 1
+  { source: 2,  target: 3,  value: 1648 },  // Step 1 → salicylic acid
+  { source: 2,  target: 4,  value: 1083 },  // Step 1 → loss (water/HCl/excess NaOPh)
+  { source: 5,  target: 6,  value: 2549 },  // MeOH   → Step 2
+  { source: 6,  target: 7,  value: 1538 },  // Step 2 → acetic anhydride
+  { source: 6,  target: 8,  value: 850  },  // Step 2 → CO₂ waste (combustion)
+  { source: 6,  target: 9,  value: 161  },  // Step 2 → untracked (H₂O etc.)
+  { source: 3,  target: 10, value: 1648 },  // SA     → Step 3
+  { source: 7,  target: 10, value: 1538 },  // Ac₂O   → Step 3
+  { source: 10, target: 11, value: 1571 },  // Step 3 → aspirin
+  { source: 10, target: 12, value: 717  },  // Step 3 → acetic acid byproduct
+  { source: 10, target: 13, value: 319  },  // Step 3 → excess Ac₂O
+  { source: 10, target: 14, value: 579  },  // Step 3 → yield loss
+];
+ 
+/* ── SVG setup ───────────────────────────────────── */
+const svg = d3.select("#sk")
+  .attr("viewBox", `0 0 ${W} ${H}`)
+  .attr("preserveAspectRatio", "xMidYMid meet");
+ 
+/* ── Sankey layout ───────────────────────────────── */
+// sankeyLeft: nodes placed as far left as possible
+// depth 0 = no incoming links (raw materials)
+// depth increases by 1 per hop
+const sankey = d3.sankey()
+  .nodeId(d => d.id)
+  .nodeAlign(d3.sankeyLeft)
+  .nodeWidth(12)
+  .nodePadding(14)
+  .extent([[PAD.left, PAD.top], [W - PAD.right, H - PAD.bottom]]);
+ 
+// d3-sankey mutates its input — pass copies
+const graph = sankey({
+  nodes: nodeData.map(d => ({ ...d })),
+  links: linkData.map(d => ({ ...d })),
+});
+ 
+/* ── tooltip helpers ─────────────────────────────── */
+const tip = d3.select("#tip");
+ 
+function showTip(event, html) {
+  const box = document.getElementById("sk").getBoundingClientRect();
+  tip.style("display", "block").html(html)
+     .style("left", (event.clientX - box.left + 12) + "px")
+     .style("top",  (event.clientY - box.top  - 36) + "px");
+}
+function moveTip(event) {
+  const box = document.getElementById("sk").getBoundingClientRect();
+  tip.style("left", (event.clientX - box.left + 12) + "px")
+     .style("top",  (event.clientY - box.top  - 36) + "px");
+}
+function hideTip() { tip.style("display", "none"); }
+ 
+/* ── draw links ──────────────────────────────────── */
+// sankeyLinkHorizontal() generates a cubic bezier path
+// stroke-width = link.width (set by sankey layout, proportional to value)
+svg.append("g")
+  .selectAll("path")
+  .data(graph.links)
+  .join("path")
+    .attr("d", d3.sankeyLinkHorizontal())
+    .attr("fill", "none")
+    .attr("stroke", d => C[nodeData[d.source.id].cat])
+    .attr("stroke-width", d => Math.max(1, d.width))
+    .attr("stroke-opacity", 0.28)
+  .on("mouseenter", function(event, d) {
+    d3.select(this).attr("stroke-opacity", 0.55);
+    showTip(event,
+      `<strong>${d.source.name} → ${d.target.name}</strong><br>` +
+      `${d.value.toLocaleString()} g`);
+  })
+  .on("mousemove", moveTip)
+  .on("mouseleave", function() {
+    d3.select(this).attr("stroke-opacity", 0.28);
+    hideTip();
+  });
+ 
+/* ── draw nodes ──────────────────────────────────── */
+const nodeG = svg.append("g")
+  .selectAll("g")
+  .data(graph.nodes)
+  .join("g")
+  .on("mouseenter", function(event, d) {
+    const inflow  = d.targetLinks.reduce((s, l) => s + l.value, 0);
+    const outflow = d.sourceLinks.reduce((s, l) => s + l.value, 0);
+    let html = `<strong>${d.name}</strong>`;
+    if (inflow)  html += `<br>In:  ${inflow.toLocaleString()} g`;
+    if (outflow) html += `<br>Out: ${outflow.toLocaleString()} g`;
+    showTip(event, html);
+  })
+  .on("mousemove", moveTip)
+  .on("mouseleave", hideTip);
+ 
+// node rectangles
+nodeG.append("rect")
+  .attr("x",      d => d.x0)
+  .attr("y",      d => d.y0)
+  .attr("height", d => Math.max(1, d.y1 - d.y0))
+  .attr("width",  d => d.x1 - d.x0)
+  .attr("fill",   d => C[d.cat])
+  .attr("rx", 2);
+ 
+// node labels
+// depth 0 → label LEFT of node (inputs on left margin)
+// depth > 0 → label RIGHT of node
+nodeG.each(function(d) {
+  const g      = d3.select(this);
+  const left   = d.depth === 0;
+  const tx     = left ? d.x0 - 6 : d.x1 + 6;
+  const anchor = left ? "end" : "start";
+  const mid    = (d.y0 + d.y1) / 2;
+  const tall   = (d.y1 - d.y0) > 20;
+ 
+  g.append("text")
+    .attr("x", tx).attr("y", tall ? mid - 6 : mid - 5)
+    .attr("text-anchor", anchor)
+    .attr("dominant-baseline", "central")
+    .attr("font-size", 11).attr("font-weight", 500)
+    .attr("fill", C[d.cat])
+    .text(d.name);
+ 
+  g.append("text")
+    .attr("x", tx).attr("y", tall ? mid + 7 : mid + 7)
+    .attr("text-anchor", anchor)
+    .attr("dominant-baseline", "central")
+    .attr("font-size", 10)
+    .attr("fill", "#888780")
+    .text(d.sub);
+});
+ 
+/* ── legend ──────────────────────────────────────── */
+const legItems = [
+  { cat: "input",   label: "Raw material"      },
+  { cat: "process", label: "Process step"       },
+  { cat: "product", label: "Desired product"    },
+  { cat: "waste",   label: "Waste / byproduct"  },
+  { cat: "loss",    label: "Yield loss"          },
+];
+const leg = d3.select("#leg");
+legItems.forEach(item => {
+  const row = leg.append("div")
+    .style("display", "flex")
+    .style("align-items", "center")
+    .style("gap", "5px");
+  row.append("span")
+    .style("display", "inline-block")
+    .style("width", "10px").style("height", "10px")
+    .style("border-radius", "2px")
+    .style("background", C[item.cat])
+    .style("flex-shrink", "0");
+  row.append("span").text(item.label);
+});
+ 
+</script>
+</body>
+</html>
+ 
