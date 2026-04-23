@@ -1,0 +1,165 @@
+
+<h2 class="sr-only">Grouped bar chart comparing actual, theoretical, and optimized yields in grams for each step of aspirin synthesis, with overall process yield shown separately.</h2>
+
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:1rem 0 1.5rem">
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:12px 14px">
+    <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Step 1 yield</div>
+    <div style="font-size:20px;font-weight:500;color:var(--color-text-primary)">77.8%</div>
+  </div>
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:12px 14px">
+    <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Step 2 yield</div>
+    <div style="font-size:20px;font-weight:500;color:var(--color-text-primary)">75.7%</div>
+  </div>
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:12px 14px">
+    <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Step 3 yield</div>
+    <div style="font-size:20px;font-weight:500;color:#A32D2D">73.1%</div>
+  </div>
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:12px 14px">
+    <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:4px">Overall yield</div>
+    <div style="font-size:20px;font-weight:500;color:var(--color-text-primary)">49.2%</div>
+  </div>
+</div>
+
+<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--color-text-secondary);margin-bottom:12px">
+  <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#5F5E5A;display:inline-block"></span>Theoretical maximum (g)</span>
+  <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#185FA5;display:inline-block"></span>Actual yield (g)</span>
+  <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#3B6D11;display:inline-block"></span>Optimized yield (g, predicted)</span>
+</div>
+
+<div style="position:relative;width:100%;height:320px">
+  <canvas id="yieldChart" role="img" aria-label="Grouped bar chart showing theoretical, actual, and optimized yields in grams for steps 1, 2, and 3 of aspirin synthesis. Step 3 has the lowest actual yield at 1571 g. Optimized scenario recovers 256 g in Step 3.">
+    Step 1: theoretical 2119 g, actual 1648 g, optimized 1648 g.
+    Step 2: theoretical 2030 g, actual 1538 g, optimized 1538 g.
+    Step 3: theoretical 2150 g, actual 1571 g, optimized 1827 g.
+  </canvas>
+</div>
+
+<div style="position:relative;width:100%;height:220px;margin-top:2rem">
+  <canvas id="overallChart" role="img" aria-label="Horizontal bar chart comparing overall aspirin yield: theoretical maximum 3191 g, current actual 1571 g, optimized predicted 1827 g.">
+    Theoretical max: 3191 g. Actual: 1571 g (49.2%). Optimized: 1827 g (57.3%).
+  </canvas>
+</div>
+
+<p style="font-size:11px;color:var(--color-text-secondary);margin-top:1rem;line-height:1.5">
+  Figure 1. Yield comparison across the three-step aspirin synthesis process. Theoretical yield is calculated from the limiting reagent for each step. Optimized yield assumes Step 3 improved to 85% via reaction condition adjustment (Rec. 3), with Steps 1–2 unchanged. Overall yield denominator is the theoretical process maximum of 3,191 g. Actual yield data from Student Data Packet (Jashnani, ID 6, 2026-03-08).
+</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const GRAY   = "#5F5E5A";
+const BLUE   = "#185FA5";
+const GREEN  = "#3B6D11";
+const RED    = "#A32D2D";
+const LGRAY  = "#B4B2A9";
+const LBLUE  = "#85B7EB";
+const LGREEN = "#97C459";
+
+new Chart(document.getElementById("yieldChart"), {
+  type: "bar",
+  data: {
+    labels: ["Step 1 — Salicylic acid", "Step 2 — Acetic anhydride", "Step 3 — Aspirin ◄ bottleneck"],
+    datasets: [
+      {
+        label: "Theoretical maximum (g)",
+        data: [2119.26, 2030.47, 2149.76],
+        backgroundColor: GRAY,
+        borderColor: GRAY,
+        borderWidth: 0,
+        borderRadius: 3,
+      },
+      {
+        label: "Actual yield (g)",
+        data: [1648.24, 1537.52, 1570.97],
+        backgroundColor: BLUE,
+        borderColor: BLUE,
+        borderWidth: 0,
+        borderRadius: 3,
+        borderDash: [],
+      },
+      {
+        label: "Optimized yield (g)",
+        data: [1648.24, 1537.52, 1827.30],
+        backgroundColor: GREEN,
+        borderColor: GREEN,
+        borderWidth: 0,
+        borderRadius: 3,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(0)} g`
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: { font: { size: 11 }, color: "#5F5E5A", autoSkip: false },
+        grid: { display: false },
+        border: { color: "#B4B2A9" }
+      },
+      y: {
+        title: { display: true, text: "Mass (g)", font: { size: 11 }, color: "#5F5E5A" },
+        min: 0,
+        max: 2400,
+        ticks: {
+          font: { size: 11 }, color: "#5F5E5A",
+          callback: v => v.toLocaleString()
+        },
+        grid: { color: "rgba(180,178,169,0.25)" },
+        border: { color: "#B4B2A9" }
+      }
+    }
+  }
+});
+
+new Chart(document.getElementById("overallChart"), {
+  type: "bar",
+  indexAxis: "y",
+  data: {
+    labels: ["Theoretical max", "Current actual", "Optimized (predicted)"],
+    datasets: [{
+      label: "Aspirin produced (g)",
+      data: [3190.85, 1570.97, 1827.30],
+      backgroundColor: [GRAY, BLUE, GREEN],
+      borderColor:     [GRAY, BLUE, GREEN],
+      borderWidth: 0,
+      borderRadius: 3,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => {
+            const pct = (ctx.parsed.x / 3190.85 * 100).toFixed(1);
+            return ` ${ctx.parsed.x.toFixed(0)} g  (${pct}% of max)`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        title: { display: true, text: "Aspirin produced (g)", font: { size: 11 }, color: "#5F5E5A" },
+        min: 0, max: 3400,
+        ticks: { font: { size: 11 }, color: "#5F5E5A", callback: v => v.toLocaleString() },
+        grid: { color: "rgba(180,178,169,0.25)" },
+        border: { color: "#B4B2A9" }
+      },
+      y: {
+        ticks: { font: { size: 11 }, color: "#5F5E5A" },
+        grid: { display: false },
+        border: { color: "#B4B2A9" }
+      }
+    }
+  }
+});
+</script>
